@@ -1,0 +1,70 @@
+# ============================================================
+# d.py cluster configuration
+# ============================================================
+# python3 d.py --config cluster.conf ...
+
+# ── Unified cache hierarchy ──
+# Used for BOTH model weights AND Docker TARs.
+# Models stored as:  {path}/models--{org}--{name}/snapshots/...
+# Docker TARs as:    {path}/containers/{image}.tar
+#
+# CHECK: walked top to bottom, first hit wins
+# DOWNLOAD: space-aware — first persistent path with enough room
+# SERVE: models always promoted to RAM (path #1) for all containers
+#
+# Bare paths     = local per-node (always checked)
+# shared: prefix = shared storage (skipped when nodes > threshold)
+# s3://          = remote download source (fallback)
+
+[cache]
+threshold = 64
+
+# Local (per-node) — always checked, fast
+/dev/shm/model-cache
+/opt/dlami/nvme/cc
+
+# Shared (team) — skipped when >64 nodes to avoid I/O throttle
+shared:/fsxnew/opensource-models/hub
+shared:/fsx/opensource-models/hub
+
+# Shared (personal) — skipped when >64 nodes
+shared:/fsx/shamiul.sheikh/hf-cache
+shared:/fsxnew/shamiul.sheikh/hf-cache
+shared:/fsx/shamiul.sheikh/cache
+shared:/fsxnew/shamiul.sheikh/cache
+shared:/home/shamiul.sheikh/cache
+shared:/home/shamiul.sheikh/important/hf-cache
+
+# S3 download source
+s3://bgen-data-team/trans/trans/
+
+# ── S3 tuning ──
+
+[s3]
+streams = 5
+multipart_chunksize = 64MB
+
+# ── Cluster ──
+
+[cluster]
+gpus_per_node = 8
+
+# ── Docker ──
+# tar_cache: legacy fallback path (also checked during TAR search)
+# The main TAR search uses the [cache] hierarchy above.
+
+[docker]
+image = vllm/vllm-openai:v0.12.0
+tar_cache = /opt/dlami/nvme/containers/
+load_timeout = 900
+
+# ── Tuning ──
+
+[tuning]
+gpu_mem_threshold_mb = 3000
+retry_count = 2
+
+# Skip RAM promote if: free RAM < model_size + this value
+# 123GB nodes: 52GB model + 20GB = 72GB > ~68GB free → serves from NVMe
+# 256GB nodes: 52GB model + 20GB = 72GB < ~100GB free → promotes to RAM
+ram_promote_headroom_gb = 20
