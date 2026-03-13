@@ -1,4 +1,4 @@
-# d.py 
+# deployer.py 
 Deploy vLLM across hundreds of GPU nodes in parallel. One command to deploy, verify, repair, or teardown.
 ---
 ## Quick Start
